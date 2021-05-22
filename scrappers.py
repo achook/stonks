@@ -1,6 +1,7 @@
 from requests import get
 from bs4 import BeautifulSoup
 from datetime import date
+from json import loads
 
 def get_generali_quotes(names):
     quotes = {}
@@ -10,6 +11,28 @@ def get_generali_quotes(names):
 
     raw_date = soup.find('input', id='valuation-date')['value']
     quote_date = date.fromisoformat(raw_date)
+
+    raw_data = get(f'https://vws.generali-investments.pl/v1/funds4website/getValuation/%7B%22date%22%3A%22{raw_date}%22%2C%22callback%22%3A%22parseApiRequestFundsValtions%22%7D?callback=a').text
+    raw_data = raw_data.replace('parseApiRequestFundsValtions({"ident": "success"}, ', '')
+    raw_data = raw_data.replace(');', '')
+    raw_data = loads(raw_data)
+
+    for fund in raw_data['funds']:
+        name = fund['name']
+
+        if name not in names:
+            continue
+
+        for category in fund['categories']:
+            if category['name'] == 'A':
+                value = category['net']
+                value = float(value)
+                value = value / 100
+
+                quotes[name] = {
+                    'quote': value,
+                    'date': quote_date
+                }
 
     return quotes
 
@@ -47,7 +70,7 @@ def get_investors_quotes(names):
 def get_nn_quotes(names):
     quotes = {}
 
-    webpage = get("https://www.nntfi.pl/notowania")
+    webpage = get('https://www.nntfi.pl/notowania')
     soup = BeautifulSoup(webpage.text, 'html.parser')
     table = soup.find('tbody', 'table_body')
 
